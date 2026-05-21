@@ -15,11 +15,26 @@ NEWS_API_KEY = "66c39f4197af4b1eb102c8308528daa1"
 
 SEARCH_QUERY = (
     '("Inter" OR "Juventus" OR "Serie A" OR "Tether Juve") '
-    'AND ("inchiesta" OR "scandalo" OR "indagini" OR "polemiche" '
-    'OR "calcioscommesse" OR "procura" OR "ardoino")'
+    'AND ("inchiesta" OR "scandalo" OR "indagini" '
+    'OR "polemiche" OR "calcioscommesse" '
+    'OR "procura" OR "ardoino")'
 )
 
+# =========================
+# TELEGRAM
+# =========================
+
 bot = Bot(token=TELEGRAM_TOKEN)
+
+async def send_telegram_message(message):
+    await bot.send_message(
+        chat_id=CHAT_ID,
+        text=message
+    )
+
+# =========================
+# FILE DUPLICATI
+# =========================
 
 SENT_FILE = "sent_news.txt"
 
@@ -30,13 +45,27 @@ else:
     already_sent = set()
 
 # =========================
-# INVIO TELEGRAM
+# FILTRI
 # =========================
 
-import asyncio
+important_words = [
+    "inchiesta",
+    "scandalo",
+    "indagine",
+    "procura",
+    "ultras",
+    "calcioscommesse",
+    "figc",
+    "corona",
+    "tether",
+    "ardoino"
+]
 
-async def send_telegram_message(message):
-    await bot.send_message(chat_id=CHAT_ID, text=message)
+team_words = [
+    "inter",
+    "juventus",
+    "serie a"
+]
 
 # =========================
 # CERCA NEWS
@@ -46,51 +75,80 @@ def search_news():
 
     print("Controllo news...")
 
-    for keyword in [SEARCH_QUERY]:
+    url = (
+        f"https://newsapi.org/v2/everything?"
+        f"q={SEARCH_QUERY}&"
+        f"language=it&"
+        f"sortBy=publishedAt&"
+        f"pageSize=20&"
+        f"apiKey={NEWS_API_KEY}"
+    )
 
-        url = (
-            f"https://newsapi.org/v2/everything?"
-            f"q={keyword}&"
-            f"language=it&"
-            f"sortBy=publishedAt&"
-            f"apiKey={NEWS_API_KEY}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print("Errore API:", response.text)
+        return
+
+    data = response.json()
+
+    articles = data.get("articles", [])
+
+    for article in articles:
+
+        title = article.get("title", "")
+        link = article.get("url", "")
+        source = article.get("source", {}).get("name", "")
+
+        title_lower = title.lower()
+
+        # =========================
+        # FILTRO INTELLIGENTE
+        # =========================
+
+        has_important = any(
+            word in title_lower
+            for word in important_words
         )
 
-        response = requests.get(url)
+        has_team = any(
+            word in title_lower
+            for word in team_words
+        )
 
-        if response.status_code != 200:
-            print("Errore API:", response.text)
+        if not (has_important and has_team):
             continue
 
-        data = response.json()
+        # =========================
+        # ANTI DUPLICATI
+        # =========================
 
-        articles = data.get("articles", [])
+        unique_id = title_lower.strip()
 
-        for article in articles[:5]:
+        if unique_id in already_sent:
+            continue
 
-            title = article["title"]
-            link = article["url"]
-            source = article["source"]["name"]
+        already_sent.add(unique_id)
 
-            unique_id = title.lower()
+        with open(SENT_FILE, "a", encoding="utf-8") as f:
+            f.write(unique_id + "\n")
 
-            if unique_id in already_sent:
-                continue
+        # =========================
+        # MESSAGGIO TELEGRAM
+        # =========================
 
-            with open(SENT_FILE, "a", encoding="utf-8") as f:
-                f.write(unique_id + "\n")
+        message = (
+            f"🚨 NUOVA NEWS\n\n"
+            f"📰 {title}\n\n"
+            f"📌 Fonte: {source}\n\n"
+            f"🔗 {link}"
+        )
 
-            message = (
-                f"🚨 NUOVA NEWS\n\n"
-                f"🔎 Keyword: {keyword}\n\n"
-                f"📰 {title}\n\n"
-                f"📌 Fonte: {source}\n\n"
-                f"🔗 {link}"
-            )
+        asyncio.run(
+            send_telegram_message(message)
+        )
 
-            asyncio.run(send_telegram_message(message))
-
-            print("Inviata:", title)
+        print("Inviata:", title)
 
 # =========================
 # SCHEDULER
