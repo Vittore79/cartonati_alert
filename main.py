@@ -14,7 +14,7 @@ NEWS_API_KEY = "66c39f4197af4b1eb102c8308528daa1"
 
 SEARCH_QUERY = (
     '("Inter" OR "Juventus" OR "Serie A") '
-    'AND ("inchiesta" OR "scandalo" OR "FIGC" OR "ultras" '
+    'AND ("inchiesta" OR "scandalo" OR "indagini" OR "polemiche" '
     'OR "calcioscommesse" OR "procura" OR "indagini")'
 )
 
