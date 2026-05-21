@@ -13,9 +13,9 @@ CHAT_ID = "7494998558"
 NEWS_API_KEY = "66c39f4197af4b1eb102c8308528daa1"
 
 SEARCH_QUERY = (
-    '("Inter" OR "Juventus" OR "Serie A") '
+    '("Inter" OR "Juventus" OR "Serie A" OR "Tether Juve") '
     'AND ("inchiesta" OR "scandalo" OR "indagini" OR "polemiche" '
-    'OR "calcioscommesse" OR "procura" OR "indagini")'
+    'OR "calcioscommesse" OR "procura" OR "ardoino")'
 )
 
 bot = Bot(token=TELEGRAM_TOKEN)
