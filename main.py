@@ -12,17 +12,11 @@ TELEGRAM_TOKEN = "8312714597:AAGXOyaW8b1k_PBS0OYf92MdgoDP2fImJXs"
 CHAT_ID = "7494998558"
 NEWS_API_KEY = "66c39f4197af4b1eb102c8308528daa1"
 
-KEYWORDS = [
-    "Inter",
-    "FIGC",
-    "ultras inter",
-    "procura inter",
-    "indagini inter",
-    "scandalo",
-    "scandalo marotta",
-    "corona inter",
-    "calcioscommesse"
-]
+SEARCH_QUERY = (
+    '("Inter" OR "Juventus" OR "Serie A") '
+    'AND ("inchiesta" OR "scandalo" OR "FIGC" OR "ultras" '
+    'OR "calcioscommesse" OR "procura" OR "indagini")'
+)
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
@@ -45,7 +39,7 @@ def search_news():
 
     print("Controllo news...")
 
-    for keyword in KEYWORDS:
+    for keyword in [SEARCH_QUERY]:
 
         url = (
             f"https://newsapi.org/v2/everything?"
@@ -71,7 +65,7 @@ def search_news():
             link = article["url"]
             source = article["source"]["name"]
 
-            unique_id = title + link
+            unique_id = title.lower()
 
             if unique_id in already_sent:
                 continue
