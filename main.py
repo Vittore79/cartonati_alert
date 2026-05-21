@@ -2,6 +2,7 @@ import requests
 import schedule
 import time
 import asyncio
+import os
 from telegram import Bot
 
 # =========================
@@ -20,7 +21,13 @@ SEARCH_QUERY = (
 
 bot = Bot(token=TELEGRAM_TOKEN)
 
-already_sent = set()
+SENT_FILE = "sent_news.txt"
+
+if os.path.exists(SENT_FILE):
+    with open(SENT_FILE, "r", encoding="utf-8") as f:
+        already_sent = set(f.read().splitlines())
+else:
+    already_sent = set()
 
 # =========================
 # INVIO TELEGRAM
@@ -70,7 +77,8 @@ def search_news():
             if unique_id in already_sent:
                 continue
 
-            already_sent.add(unique_id)
+            with open(SENT_FILE, "a", encoding="utf-8") as f:
+                f.write(unique_id + "\n")
 
             message = (
                 f"🚨 NUOVA NEWS\n\n"
