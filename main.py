@@ -34,10 +34,8 @@ already_sent = set()
 
 import asyncio
 
-def send_telegram_message(message):
-    asyncio.run(
-        bot.send_message(chat_id=CHAT_ID, text=message)
-    )
+async def send_telegram_message(message):
+    await bot.send_message(chat_id=CHAT_ID, text=message)
 
 # =========================
 # CERCA NEWS
@@ -88,7 +86,7 @@ def search_news():
                 f"🔗 {link}"
             )
 
-            send_telegram_message(message)
+            asyncio.run(send_telegram_message(message))
 
             print("Inviata:", title)
 
