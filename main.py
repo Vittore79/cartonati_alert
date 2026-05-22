@@ -27,10 +27,13 @@ SEARCH_QUERY = (
 bot = Bot(token=TELEGRAM_TOKEN)
 
 async def send_telegram_message(message):
-    await bot.send_message(
-        chat_id=CHAT_ID,
-        text=message
-    )
+    try:
+        await bot.send_message(
+            chat_id=CHAT_ID,
+            text=message
+        )
+    except Exception as e:
+        print("Errore Telegram:", e)
 
 # =========================
 # FILE DUPLICATI
@@ -58,7 +61,11 @@ important_words = [
     "figc",
     "corona",
     "tether",
-    "ardoino"
+    "ardoino",
+    "polemica",
+    "accuse",
+    "caos",
+    "scontro"
 ]
 
 team_words = [
@@ -68,12 +75,28 @@ team_words = [
 ]
 
 # =========================
+# HEARTBEAT
+# =========================
+
+def heartbeat():
+    print("Bot online e funzionante")
+
+    asyncio.run(
+        send_telegram_message(
+            "✅ Cartonati Alert online e funzionante"
+        )
+    )
+
+# =========================
 # CERCA NEWS
 # =========================
 
 def search_news():
 
+    print("\n========================")
     print("Controllo news...")
+    print("Ora:", time.strftime("%H:%M:%S"))
+    print("========================")
 
     url = (
         f"https://newsapi.org/v2/everything?"
@@ -84,80 +107,98 @@ def search_news():
         f"apiKey={NEWS_API_KEY}"
     )
 
-    response = requests.get(url)
+    try:
+        response = requests.get(url)
 
-    if response.status_code != 200:
-        print("Errore API:", response.text)
-        return
+        if response.status_code != 200:
+            print("Errore API:", response.text)
+            return
 
-    data = response.json()
+        data = response.json()
 
-    articles = data.get("articles", [])
+        articles = data.get("articles", [])
 
-    for article in articles:
+        print(f"News trovate: {len(articles)}")
 
-        title = article.get("title", "")
-        link = article.get("url", "")
-        source = article.get("source", {}).get("name", "")
+        sent_count = 0
 
-        title_lower = title.lower()
+        for article in articles:
 
-        # =========================
-        # FILTRO INTELLIGENTE
-        # =========================
+            title = article.get("title", "")
+            link = article.get("url", "")
+            source = article.get("source", {}).get("name", "")
 
-        has_important = any(
-            word in title_lower
-            for word in important_words
-        )
+            title_lower = title.lower()
 
-        has_team = any(
-            word in title_lower
-            for word in team_words
-        )
+            # =========================
+            # FILTRO INTELLIGENTE
+            # =========================
 
-        if not (has_important and has_team):
-            continue
+            has_important = any(
+                word in title_lower
+                for word in important_words
+            )
 
-        # =========================
-        # ANTI DUPLICATI
-        # =========================
+            has_team = any(
+                word in title_lower
+                for word in team_words
+            )
 
-        unique_id = title_lower.strip()
+            if not (has_important and has_team):
+                print("Scartata:", title)
+                continue
 
-        if unique_id in already_sent:
-            continue
+            # =========================
+            # ANTI DUPLICATI
+            # =========================
 
-        already_sent.add(unique_id)
+            unique_id = title_lower.strip()
 
-        with open(SENT_FILE, "a", encoding="utf-8") as f:
-            f.write(unique_id + "\n")
+            if unique_id in already_sent:
+                print("Duplicata:", title)
+                continue
 
-        # =========================
-        # MESSAGGIO TELEGRAM
-        # =========================
+            already_sent.add(unique_id)
 
-        message = (
-            f"🚨 NUOVA NEWS\n\n"
-            f"📰 {title}\n\n"
-            f"📌 Fonte: {source}\n\n"
-            f"🔗 {link}"
-        )
+            with open(SENT_FILE, "a", encoding="utf-8") as f:
+                f.write(unique_id + "\n")
 
-        asyncio.run(
-            send_telegram_message(message)
-        )
+            # =========================
+            # MESSAGGIO TELEGRAM
+            # =========================
 
-        print("Inviata:", title)
+            message = (
+                f"🚨 NUOVA NEWS\n\n"
+                f"📰 {title}\n\n"
+                f"📌 Fonte: {source}\n\n"
+                f"🔗 {link}"
+            )
+
+            asyncio.run(
+                send_telegram_message(message)
+            )
+
+            sent_count += 1
+
+            print("Inviata:", title)
+
+        print(f"\nNews inviate: {sent_count}")
+
+    except Exception as e:
+        print("Errore generale:", e)
 
 # =========================
 # SCHEDULER
 # =========================
 
-schedule.every(5).minutes.do(search_news)
+schedule.every(60).minutes.do(search_news)
+
+# heartbeat ogni 12 ore
+schedule.every(12).hours.do(heartbeat)
 
 print("BOT AVVIATO")
 
+heartbeat()
 search_news()
 
 while True:
