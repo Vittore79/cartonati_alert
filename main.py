@@ -1,8 +1,10 @@
-import requests
+import feedparser
 import schedule
 import time
 import asyncio
 import os
+
+from datetime import datetime, timezone, timedelta
 from telegram import Bot
 
 # =========================
@@ -11,14 +13,25 @@ from telegram import Bot
 
 TELEGRAM_TOKEN = "8312714597:AAGXOyaW8b1k_PBS0OYf92MdgoDP2fImJXs"
 CHAT_ID = "7494998558"
-NEWS_API_KEY = "66c39f4197af4b1eb102c8308528daa1"
 
-SEARCH_QUERY = (
-    '("Inter" OR "Juventus" OR "Serie A" OR "Tether Juve") '
-    'AND ("inchiesta" OR "scandalo" OR "indagini" '
-    'OR "polemiche" OR "calcioscommesse" '
-    'OR "procura" OR "ardoino")'
-)
+RSS_FEEDS = [
+
+    # GOOGLE NEWS
+    "https://news.google.com/rss/search?q=Inter+scandalo&hl=it&gl=IT&ceid=IT:it",
+
+    "https://news.google.com/rss/search?q=Juventus+FIGC&hl=it&gl=IT&ceid=IT:it",
+
+    "https://news.google.com/rss/search?q=Serie+A+ultras&hl=it&gl=IT&ceid=IT:it",
+
+    "https://news.google.com/rss/search?q=Inter+inchiesta&hl=it&gl=IT&ceid=IT:it",
+
+    "https://news.google.com/rss/search?q=Juventus+scandalo&hl=it&gl=IT&ceid=IT:it",
+
+    # RSS DIRETTI
+    "https://www.ansa.it/sito/notizie/sport/calcio/calcio_rss.xml",
+
+    "https://www.gazzetta.it/rss/home.xml"
+]
 
 # =========================
 # TELEGRAM
@@ -27,12 +40,16 @@ SEARCH_QUERY = (
 bot = Bot(token=TELEGRAM_TOKEN)
 
 async def send_telegram_message(message):
+
     try:
+
         await bot.send_message(
             chat_id=CHAT_ID,
             text=message
         )
+
     except Exception as e:
+
         print("Errore Telegram:", e)
 
 # =========================
@@ -42,9 +59,15 @@ async def send_telegram_message(message):
 SENT_FILE = "sent_news.txt"
 
 if os.path.exists(SENT_FILE):
+
     with open(SENT_FILE, "r", encoding="utf-8") as f:
-        already_sent = set(f.read().splitlines())
+
+        already_sent = set(
+            f.read().splitlines()
+        )
+
 else:
+
     already_sent = set()
 
 # =========================
@@ -52,6 +75,7 @@ else:
 # =========================
 
 important_words = [
+
     "inchiesta",
     "scandalo",
     "indagine",
@@ -63,15 +87,36 @@ important_words = [
     "tether",
     "ardoino",
     "polemica",
-    "accuse",
     "caos",
-    "scontro"
+    "accuse",
+    "scontro",
+    "violazione",
+    "irregolarità",
+
+    # extra
+    "mercato",
+    "tifosi",
+    "contestazione",
+    "curva",
+    "società",
+    "esonero",
+    "dimissioni",
+    "attacco",
+    "denuncia",
+    "inchieste",
+    "guai",
+    "caso"
 ]
 
 team_words = [
+
     "inter",
     "juventus",
-    "serie a"
+    "serie a",
+    "milan",
+    "napoli",
+    "roma",
+    "lazio"
 ]
 
 # =========================
@@ -79,9 +124,13 @@ team_words = [
 # =========================
 
 def heartbeat():
-    print("Bot online e funzionante")
+
+    print("\n========================")
+    print("BOT ONLINE")
+    print("========================")
 
     asyncio.run(
+
         send_telegram_message(
             "✅ Cartonati Alert online e funzionante"
         )
@@ -94,98 +143,130 @@ def heartbeat():
 def search_news():
 
     print("\n========================")
-    print("Controllo news...")
+    print("Controllo news RSS...")
     print("Ora:", time.strftime("%H:%M:%S"))
     print("========================")
 
-    url = (
-        f"https://newsapi.org/v2/everything?"
-        f"q={SEARCH_QUERY}&"
-        f"language=it&"
-        f"sortBy=publishedAt&"
-        f"pageSize=20&"
-        f"apiKey={NEWS_API_KEY}"
-    )
+    sent_count = 0
 
-    try:
-        response = requests.get(url)
+    for feed_url in RSS_FEEDS:
 
-        if response.status_code != 200:
-            print("Errore API:", response.text)
-            return
+        print(f"\nFeed: {feed_url}")
 
-        data = response.json()
+        try:
 
-        articles = data.get("articles", [])
+            feed = feedparser.parse(feed_url)
 
-        print(f"News trovate: {len(articles)}")
+            print(f"Articoli trovati: {len(feed.entries)}")
 
-        sent_count = 0
+            for entry in feed.entries[:20]:
 
-        for article in articles:
+                try:
 
-            title = article.get("title", "")
-            link = article.get("url", "")
-            source = article.get("source", {}).get("name", "")
+                    title = entry.title
+                    link = entry.link
 
-            title_lower = title.lower()
+                    # =========================
+                    # DATA ARTICOLO
+                    # =========================
 
-            # =========================
-            # FILTRO INTELLIGENTE
-            # =========================
+                    if hasattr(entry, "published_parsed"):
 
-            has_important = any(
-                word in title_lower
-                for word in important_words
-            )
+                        article_date = datetime(
+                            *entry.published_parsed[:6],
+                            tzinfo=timezone.utc
+                        )
 
-            has_team = any(
-                word in title_lower
-                for word in team_words
-            )
+                        now = datetime.now(timezone.utc)
 
-            if not (has_important and has_team):
-                print("Scartata:", title)
-                continue
+                        age = now - article_date
 
-            # =========================
-            # ANTI DUPLICATI
-            # =========================
+                        # SOLO NEWS ULTIME 48H
+                        if age > timedelta(hours=48):
 
-            unique_id = title_lower.strip()
+                            print("Vecchia:", title)
 
-            if unique_id in already_sent:
-                print("Duplicata:", title)
-                continue
+                            continue
 
-            already_sent.add(unique_id)
+                    title_lower = title.lower()
 
-            with open(SENT_FILE, "a", encoding="utf-8") as f:
-                f.write(unique_id + "\n")
+                    # =========================
+                    # FILTRO INTELLIGENTE
+                    # =========================
 
-            # =========================
-            # MESSAGGIO TELEGRAM
-            # =========================
+                    has_important = any(
 
-            message = (
-                f"🚨 NUOVA NEWS\n\n"
-                f"📰 {title}\n\n"
-                f"📌 Fonte: {source}\n\n"
-                f"🔗 {link}"
-            )
+                        word in title_lower
 
-            asyncio.run(
-                send_telegram_message(message)
-            )
+                        for word in important_words
+                    )
 
-            sent_count += 1
+                    has_team = any(
 
-            print("Inviata:", title)
+                        word in title_lower
 
-        print(f"\nNews inviate: {sent_count}")
+                        for word in team_words
+                    )
 
-    except Exception as e:
-        print("Errore generale:", e)
+                    if not (has_important and has_team):
+
+                        print("Scartata:", title)
+
+                        continue
+
+                    # =========================
+                    # ANTI DUPLICATI
+                    # =========================
+
+                    unique_id = title_lower.strip()
+
+                    if unique_id in already_sent:
+
+                        print("Duplicata:", title)
+
+                        continue
+
+                    already_sent.add(unique_id)
+
+                    with open(
+                        SENT_FILE,
+                        "a",
+                        encoding="utf-8"
+                    ) as f:
+
+                        f.write(unique_id + "\n")
+
+                    # =========================
+                    # TELEGRAM
+                    # =========================
+
+                    message = (
+
+                        f"🚨 NUOVA NEWS\n\n"
+                        f"📰 {title}\n\n"
+                        f"🔗 {link}"
+                    )
+
+                    asyncio.run(
+
+                        send_telegram_message(message)
+                    )
+
+                    sent_count += 1
+
+                    print("Inviata:", title)
+
+                except Exception as e:
+
+                    print("Errore articolo:", e)
+
+        except Exception as e:
+
+            print("Errore feed:", e)
+
+    print("\n========================")
+    print(f"News inviate: {sent_count}")
+    print("========================")
 
 # =========================
 # SCHEDULER
@@ -196,11 +277,16 @@ schedule.every(60).minutes.do(search_news)
 # heartbeat ogni 12 ore
 schedule.every(12).hours.do(heartbeat)
 
+print("\n========================")
 print("BOT AVVIATO")
+print("========================")
 
 heartbeat()
+
 search_news()
 
 while True:
+
     schedule.run_pending()
+
     time.sleep(1)
