@@ -60,6 +60,18 @@ RSS_FEEDS = [
     "https://www.dagospia.com/rss",
 
     # =========================
+    # REDDIT
+    # =========================
+
+    "https://www.reddit.com/r/soccer/.rss",
+
+    "https://www.reddit.com/r/seriea/.rss",
+
+    "https://www.reddit.com/r/Juve/.rss",
+
+    "https://www.reddit.com/r/calcio/.rss",
+
+    # =========================
     # ECONOMIA / POLITICA SPORTIVA
     # =========================
 
